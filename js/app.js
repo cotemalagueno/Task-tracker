@@ -1,4 +1,4 @@
-import { firebaseConfig } from "./firebase-config.js?v=3";
+import { firebaseConfig } from "./firebase-config.js?v=4";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getAuth, signInAnonymously, onAuthStateChanged
@@ -748,8 +748,12 @@ function renderCalendar() {
       </div>
     `;
     cell.querySelectorAll(".calendar-task-chip").forEach((chip) => {
-      chip.addEventListener("click", () => openModal(chip.dataset.id));
+      chip.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openModal(chip.dataset.id);
+      });
     });
+    cell.addEventListener("click", () => createTask({ dueDate: key }));
     grid.appendChild(cell);
   }
 }
@@ -813,7 +817,7 @@ function renderHours() {
 // ===================================================================
 // TASK MODAL
 // ===================================================================
-$("#new-task-btn").addEventListener("click", async () => {
+async function createTask(overrides = {}) {
   const ref = await addDoc(tasksCol, {
     title: "",
     description: "",
@@ -826,10 +830,13 @@ $("#new-task-btn").addEventListener("click", async () => {
     subtasks: [],
     createdBy: me.id,
     createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
+    updatedAt: serverTimestamp(),
+    ...overrides
   });
   openModal(ref.id);
-});
+}
+
+$("#new-task-btn").addEventListener("click", () => createTask());
 
 function openModal(id) {
   activeTaskId = id;
@@ -841,6 +848,12 @@ function openModal(id) {
 }
 
 function closeModal() {
+  // Blur whatever field was focused — otherwise fillModal()'s "don't stomp on
+  // what the user is typing" guard sees a stale focused field on the *next*
+  // openModal() and skips refilling it, leaving the previous task's value showing.
+  if (document.activeElement && $("#task-modal").contains(document.activeElement)) {
+    document.activeElement.blur();
+  }
   activeTaskId = null;
   $("#task-modal").classList.add("hidden");
 }
