@@ -1,4 +1,4 @@
-import { firebaseConfig } from "./firebase-config.js";
+import { firebaseConfig } from "./firebase-config.js?v=3";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getAuth, signInAnonymously, onAuthStateChanged
@@ -7,6 +7,21 @@ import {
   getFirestore, collection, doc, addDoc, updateDoc, deleteDoc,
   onSnapshot, serverTimestamp, query, orderBy
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+// ===================================================================
+// SAFETY NET — if anything throws while wiring up the page (e.g. a stale
+// cached script after a deploy doesn't match the current HTML), show a
+// visible message instead of silently leaving every button dead.
+// ===================================================================
+window.addEventListener("error", (e) => {
+  console.error("Task Tracker error:", e.error || e.message);
+  if (document.getElementById("tt-error-banner")) return;
+  const banner = document.createElement("div");
+  banner.id = "tt-error-banner";
+  banner.style.cssText = "position:fixed;top:0;left:0;right:0;background:#ffe2e2;color:#8a2c2c;padding:12px 16px;font:600 13px -apple-system,system-ui,sans-serif;text-align:center;z-index:99999;box-shadow:0 2px 8px rgba(0,0,0,.1);";
+  banner.textContent = "Algo falló al cargar la página. Recárgala (Ctrl/Cmd + Shift + R). Si sigue igual, avisa al equipo.";
+  document.body.prepend(banner);
+});
 
 // ===================================================================
 // SETUP CHECK — evita que la app truene si aún no se configuró Firebase
