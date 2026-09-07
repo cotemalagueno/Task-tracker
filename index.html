@@ -70,6 +70,7 @@
           Subir foto
         </label>
         <input type="file" id="photo-input" accept="image/*" hidden />
+        <p class="avatar-required-hint">Obligatoria — así tu equipo te reconoce en el tablero</p>
       </div>
       <input type="text" id="name-input" class="text-input" placeholder="Tu nombre" maxlength="30" autocomplete="off" />
       <input type="password" id="create-password" class="text-input" placeholder="Crea una clave" autocomplete="off" />
@@ -123,7 +124,13 @@
 
     <div class="sidebar-footer">
       <div class="me-badge">
-        <div class="me-avatar" id="me-avatar"></div>
+        <button class="me-avatar-btn" id="me-avatar-btn" title="Cambiar mi foto">
+          <div class="me-avatar" id="me-avatar"></div>
+          <span class="me-avatar-edit">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8a2 2 0 0 1 2-2h1.2l1.3-1.8h6.9L16.8 6H18a2 2 0 0 1 2 2v9.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.3"/></svg>
+          </span>
+        </button>
+        <input type="file" id="change-photo-input" accept="image/*" hidden />
         <div class="me-name" id="me-name">—</div>
       </div>
       <button id="logout-btn" class="icon-btn" title="Cambiar de usuario">

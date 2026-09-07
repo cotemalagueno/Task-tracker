@@ -223,39 +223,48 @@ $("#name-input").addEventListener("input", () => { updateCreateAvatarPreview(); 
 $("#create-password").addEventListener("input", validateCreateForm);
 $("#create-password-confirm").addEventListener("input", validateCreateForm);
 
-$("#photo-input").addEventListener("change", (e) => {
+function readAndResizeImage(file, size = 160) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        const scale = Math.max(size / img.width, size / img.height);
+        const w = img.width * scale, h = img.height * scale;
+        ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+        resolve(canvas.toDataURL("image/jpeg", 0.75));
+      };
+      img.onerror = reject;
+      img.src = ev.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+$("#photo-input").addEventListener("change", async (e) => {
   const file = e.target.files[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (ev) => {
-    const img = new Image();
-    img.onload = () => {
-      const size = 160;
-      const canvas = document.createElement("canvas");
-      canvas.width = size; canvas.height = size;
-      const ctx = canvas.getContext("2d");
-      const scale = Math.max(size / img.width, size / img.height);
-      const w = img.width * scale, h = img.height * scale;
-      ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
-      uploadedPhoto = canvas.toDataURL("image/jpeg", 0.75);
-      updateCreateAvatarPreview();
-    };
-    img.src = ev.target.result;
-  };
-  reader.readAsDataURL(file);
+  uploadedPhoto = await readAndResizeImage(file);
+  updateCreateAvatarPreview();
+  validateCreateForm();
 });
 
 function validateCreateForm() {
   const name = $("#name-input").value.trim();
   const pass = $("#create-password").value;
   const confirm = $("#create-password-confirm").value;
-  $("#create-btn").disabled = !(name.length > 0 && pass.length >= 4 && pass === confirm);
+  $("#create-btn").disabled = !(name.length > 0 && pass.length >= 4 && pass === confirm && uploadedPhoto);
 }
 
 $("#create-btn").addEventListener("click", async () => {
   const name = $("#name-input").value.trim();
   const pass = $("#create-password").value;
   const confirm = $("#create-password-confirm").value;
+  if (!uploadedPhoto) { showCreateError("Sube una foto de perfil para continuar."); return; }
   if (pass.length < 4) { showCreateError("La clave debe tener al menos 4 caracteres."); return; }
   if (pass !== confirm) { showCreateError("Las claves no coinciden."); return; }
 
@@ -265,15 +274,15 @@ $("#create-btn").addEventListener("click", async () => {
     const { saltB64, hashB64 } = await hashPassword(pass);
     const ref = await addDoc(usersCol, {
       name,
-      avatarType: uploadedPhoto ? "photo" : "initials",
-      avatarValue: uploadedPhoto || null,
+      avatarType: "photo",
+      avatarValue: uploadedPhoto,
       colorIndex: newProfileColorIndex,
       passwordSalt: saltB64,
       passwordHash: hashB64,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
-    loginAsProfile({ id: ref.id, name, avatarType: uploadedPhoto ? "photo" : "initials", avatarValue: uploadedPhoto, colorIndex: newProfileColorIndex });
+    loginAsProfile({ id: ref.id, name, avatarType: "photo", avatarValue: uploadedPhoto, colorIndex: newProfileColorIndex });
   } catch (err) {
     showCreateError("No se pudo crear el usuario. Intenta de nuevo.");
     console.error(err);
@@ -310,6 +319,26 @@ $("#logout-btn").addEventListener("click", () => {
   appEl.classList.add("hidden");
   profileScreen.classList.remove("hidden");
   renderProfilePicker();
+});
+
+// ===================================================================
+// CHANGE MY PHOTO (from the sidebar avatar)
+// ===================================================================
+$("#me-avatar-btn").addEventListener("click", () => $("#change-photo-input").click());
+
+$("#change-photo-input").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file || !me) return;
+  const dataURL = await readAndResizeImage(file);
+  me.avatarType = "photo";
+  me.avatarValue = dataURL;
+  $("#me-avatar").innerHTML = avatarHTML(me);
+  await updateDoc(doc(usersCol, me.id), {
+    avatarType: "photo",
+    avatarValue: dataURL,
+    updatedAt: serverTimestamp()
+  });
 });
 
 // ===================================================================

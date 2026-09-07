@@ -131,6 +131,7 @@ input, select, textarea{ font-family: inherit; }
 .login-card .text-input{ margin-bottom:14px; text-align:center; }
 .login-card .btn-primary{ width:100%; }
 .login-hint{ color: var(--text-faint); font-size:11.5px; margin-top:14px; line-height:1.5; }
+.avatar-required-hint{ color: var(--text-faint); font-size:11px; margin:6px 0 0; }
 .form-error{ color:#c9553c; font-size:12px; font-weight:600; margin:-6px 0 12px; }
 
 .panel-loading{ color: var(--text-dim); font-size:13px; font-weight:600; padding:20px 0; }
@@ -194,8 +195,15 @@ input, select, textarea{ font-family: inherit; }
 
 .sidebar-footer{ margin-top:auto; display:flex; align-items:center; justify-content:space-between; padding-top:14px; border-top:1px solid var(--border); }
 .me-badge{ display:flex; align-items:center; gap:8px; min-width:0; }
+.me-avatar-btn{ position:relative; width:30px; height:30px; flex-shrink:0; border:none; padding:0; background:none; cursor:pointer; border-radius:50%; }
 .me-avatar{ width:30px; height:30px; border-radius:50%; overflow:hidden; display:flex; align-items:center; justify-content:center; background:var(--accent-soft); font-size:15px; flex-shrink:0; }
 .me-avatar img{ width:100%; height:100%; object-fit:cover; }
+.me-avatar-edit{
+  position:absolute; inset:0; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  background: rgba(20,22,35,.55); color:#fff; opacity:0; transition: opacity .12s ease;
+}
+.me-avatar-edit svg{ width:13px; height:13px; }
+.me-avatar-btn:hover .me-avatar-edit{ opacity:1; }
 .me-name{ font-size:12.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:110px; }
 
 .main{ flex:1; min-width:0; display:flex; flex-direction:column; }
