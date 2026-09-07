@@ -101,8 +101,12 @@
         <span>Tablero</span>
       </button>
       <button class="nav-item" data-view="timeline">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2.2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="14" y2="6"/><line x1="4" y1="12" x2="19" y2="12"/><line x1="4" y1="18" x2="10" y2="18"/></svg>
         <span>Línea de tiempo</span>
+      </button>
+      <button class="nav-item" data-view="calendar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2.2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/></svg>
+        <span>Calendario</span>
       </button>
       <button class="nav-item" data-view="hours">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12.3 15.5 14.3"/></svg>
@@ -124,17 +128,11 @@
 
     <div class="sidebar-footer">
       <div class="me-badge">
-        <button class="me-avatar-btn" id="me-avatar-btn" title="Cambiar mi foto">
-          <div class="me-avatar" id="me-avatar"></div>
-          <span class="me-avatar-edit">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8a2 2 0 0 1 2-2h1.2l1.3-1.8h6.9L16.8 6H18a2 2 0 0 1 2 2v9.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.3"/></svg>
-          </span>
-        </button>
-        <input type="file" id="change-photo-input" accept="image/*" hidden />
+        <div class="me-avatar" id="me-avatar"></div>
         <div class="me-name" id="me-name">—</div>
       </div>
-      <button id="logout-btn" class="icon-btn" title="Cambiar de usuario">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 20 7 16 11"/><path d="M4 11V9a2 2 0 0 1 2-2h14"/><polyline points="8 21 4 17 8 13"/><path d="M20 13v2a2 2 0 0 1-2 2H4"/></svg>
+      <button id="profile-settings-btn" class="icon-btn" title="Configuración de mi perfil">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><circle cx="9" cy="6" r="2" fill="var(--surface)"/><line x1="4" y1="12" x2="20" y2="12"/><circle cx="15" cy="12" r="2" fill="var(--surface)"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="9" cy="18" r="2" fill="var(--surface)"/></svg>
       </button>
     </div>
   </aside>
@@ -177,6 +175,25 @@
       </div>
     </section>
 
+    <!-- CALENDAR VIEW -->
+    <section id="view-calendar" class="view hidden">
+      <div class="calendar-wrap">
+        <div class="calendar-toolbar">
+          <button id="cal-prev" class="icon-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <div id="cal-month-label" class="calendar-month-label"></div>
+          <button id="cal-next" class="icon-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+        <div class="calendar-weekdays">
+          <span>Lun</span><span>Mar</span><span>Mié</span><span>Jue</span><span>Vie</span><span>Sáb</span><span>Dom</span>
+        </div>
+        <div class="calendar-grid" id="calendar-grid"></div>
+      </div>
+    </section>
+
     <!-- HOURS VIEW -->
     <section id="view-hours" class="view hidden">
       <div class="hours-list" id="hours-list"></div>
@@ -196,18 +213,15 @@
 
     <textarea id="modal-desc" class="modal-textarea" placeholder="Descripción (opcional)" maxlength="500"></textarea>
 
+    <div class="field" style="margin-bottom:14px;">
+      <label>Estado</label>
+      <div class="status-btn-row" id="modal-status-row"></div>
+    </div>
+
     <div class="modal-grid">
       <div class="field">
         <label>Responsable</label>
         <select id="modal-assignee"></select>
-      </div>
-      <div class="field">
-        <label>Estado</label>
-        <select id="modal-status">
-          <option value="todo">Por hacer</option>
-          <option value="in-progress">En progreso</option>
-          <option value="done">Hecho</option>
-        </select>
       </div>
       <div class="field">
         <label>Color</label>
@@ -252,6 +266,39 @@
       </button>
       <button id="save-task-btn" class="btn-primary">Cerrar</button>
     </div>
+  </div>
+</div>
+
+<!-- ============ PROFILE SETTINGS MODAL ============ -->
+<div id="settings-modal" class="modal-overlay hidden">
+  <div class="modal settings-card">
+    <div class="modal-head">
+      <h3 class="modal-simple-title">Mi perfil</h3>
+      <button id="settings-close-btn" class="icon-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+      </button>
+    </div>
+
+    <div class="avatar-picker">
+      <div class="avatar-preview" id="settings-avatar-preview"></div>
+      <label class="btn-ghost small" for="settings-photo-input">
+        <span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8a2 2 0 0 1 2-2h1.2l1.3-1.8h6.9L16.8 6H18a2 2 0 0 1 2 2v9.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.3"/></svg></span>
+        Cambiar foto
+      </label>
+      <input type="file" id="settings-photo-input" accept="image/*" hidden />
+    </div>
+
+    <div class="field" style="margin-bottom:18px;">
+      <label>Nombre</label>
+      <input type="text" id="settings-name-input" class="text-input" maxlength="30" />
+    </div>
+
+    <button id="settings-save-btn" class="btn-primary" style="width:100%;margin-bottom:10px;">Guardar cambios</button>
+    <button id="settings-switch-btn" class="btn-ghost" style="width:100%;">
+      <span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 20 7 16 11"/><path d="M4 11V9a2 2 0 0 1 2-2h14"/><polyline points="8 21 4 17 8 13"/><path d="M20 13v2a2 2 0 0 1-2 2H4"/></svg></span>
+      Cambiar de perfil
+    </button>
+    <p id="settings-error" class="form-error hidden"></p>
   </div>
 </div>
 

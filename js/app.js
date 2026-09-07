@@ -59,6 +59,8 @@ let autoLoginTried = false;
 let uploadedPhoto = null;
 let newProfileColorIndex = Math.floor(Math.random() * COLORS.length);
 let pendingAuthProfile = null;
+let calendarCursor = new Date();
+calendarCursor.setDate(1);
 
 // ===================================================================
 // DOM SHORTCUTS
@@ -313,32 +315,61 @@ function loginAsProfile(profile) {
   startTaskListener();
 }
 
-$("#logout-btn").addEventListener("click", () => {
+function switchProfile() {
   localStorage.removeItem("tt_active_profile_id");
   me = null;
   appEl.classList.add("hidden");
   profileScreen.classList.remove("hidden");
   renderProfilePicker();
+}
+
+// ===================================================================
+// PROFILE SETTINGS MODAL (rename, change photo, switch profile)
+// ===================================================================
+let pendingSettingsPhoto = null;
+
+$("#profile-settings-btn").addEventListener("click", () => {
+  if (!me) return;
+  pendingSettingsPhoto = null;
+  $("#settings-avatar-preview").innerHTML = avatarHTML(me);
+  $("#settings-name-input").value = me.name;
+  $("#settings-error").classList.add("hidden");
+  $("#settings-modal").classList.remove("hidden");
 });
 
-// ===================================================================
-// CHANGE MY PHOTO (from the sidebar avatar)
-// ===================================================================
-$("#me-avatar-btn").addEventListener("click", () => $("#change-photo-input").click());
+function closeSettingsModal() { $("#settings-modal").classList.add("hidden"); }
+$("#settings-close-btn").addEventListener("click", closeSettingsModal);
+$("#settings-modal").addEventListener("click", (e) => { if (e.target.id === "settings-modal") closeSettingsModal(); });
 
-$("#change-photo-input").addEventListener("change", async (e) => {
+$("#settings-photo-input").addEventListener("change", async (e) => {
   const file = e.target.files[0];
-  e.target.value = "";
-  if (!file || !me) return;
-  const dataURL = await readAndResizeImage(file);
-  me.avatarType = "photo";
-  me.avatarValue = dataURL;
+  if (!file) return;
+  pendingSettingsPhoto = await readAndResizeImage(file);
+  $("#settings-avatar-preview").innerHTML = `<img src="${pendingSettingsPhoto}" />`;
+});
+
+$("#settings-save-btn").addEventListener("click", async () => {
+  const name = $("#settings-name-input").value.trim();
+  if (!name) {
+    $("#settings-error").textContent = "Ponle un nombre a tu perfil.";
+    $("#settings-error").classList.remove("hidden");
+    return;
+  }
+  const updates = { name, updatedAt: serverTimestamp() };
+  if (pendingSettingsPhoto) {
+    updates.avatarType = "photo";
+    updates.avatarValue = pendingSettingsPhoto;
+  }
+  await updateDoc(doc(usersCol, me.id), updates);
+  me = { ...me, ...updates };
+  $("#me-name").textContent = me.name;
   $("#me-avatar").innerHTML = avatarHTML(me);
-  await updateDoc(doc(usersCol, me.id), {
-    avatarType: "photo",
-    avatarValue: dataURL,
-    updatedAt: serverTimestamp()
-  });
+  closeSettingsModal();
+});
+
+$("#settings-switch-btn").addEventListener("click", () => {
+  closeSettingsModal();
+  switchProfile();
 });
 
 // ===================================================================
@@ -488,6 +519,7 @@ function renderCurrentView() {
   if (!me) return;
   if (currentView === "board") renderBoard();
   else if (currentView === "timeline") renderTimeline();
+  else if (currentView === "calendar") renderCalendar();
   else if (currentView === "hours") renderHours();
 }
 
@@ -535,12 +567,24 @@ function taskCard(t) {
       ${assignee ? `<span class="avatar-sm" title="${escapeHTML(assignee.name)}">${avatarHTML(assignee)}</span>` : ""}
     </div>
     <div class="task-card-bar"><div class="task-card-bar-fill" style="width:${pct}%; background:${t.color || COLORS[0]}"></div></div>
-    ${subCount > 0 ? `<div class="task-card-sub">${subDone}/${subCount} subtareas · ${pct}%</div>` : `<div class="task-card-sub">${pct}%</div>`}
+    ${subCount > 0
+      ? `<div class="task-card-subtasks">${t.subtasks.map((s) => `
+          <div class="task-card-subtask" data-id="${s.id}">
+            <span class="task-card-subtask-check ${s.done ? "checked" : ""}">${s.done ? ICON_CHECK_SMALL : ""}</span>
+            <span class="task-card-subtask-text ${s.done ? "done" : ""}">${escapeHTML(s.title)}</span>
+          </div>`).join("")}</div>`
+      : `<div class="task-card-sub">${pct}%</div>`}
   `;
 
   card.addEventListener("click", () => openModal(t.id));
   card.addEventListener("dragstart", (e) => {
     e.dataTransfer.setData("text/plain", t.id);
+  });
+  card.querySelectorAll(".task-card-subtask").forEach((row) => {
+    row.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleSubtask(t.id, row.dataset.id);
+    });
   });
   return card;
 }
@@ -645,6 +689,66 @@ function renderTimeline() {
 }
 
 // ===================================================================
+// CALENDAR VIEW
+// ===================================================================
+function renderCalendar() {
+  const list = filteredTasks();
+  const year = calendarCursor.getFullYear();
+  const month = calendarCursor.getMonth();
+
+  $("#cal-month-label").textContent = new Intl.DateTimeFormat("es", { month: "long", year: "numeric" }).format(calendarCursor);
+
+  const firstOfMonth = new Date(year, month, 1);
+  const startOffset = (firstOfMonth.getDay() + 6) % 7; // week starts Monday
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const totalCells = Math.ceil((startOffset + daysInMonth) / 7) * 7;
+  const todayKey = todayStr();
+
+  const tasksByDay = {};
+  list.forEach((t) => {
+    if (!t.dueDate) return;
+    (tasksByDay[t.dueDate] = tasksByDay[t.dueDate] || []).push(t);
+  });
+
+  const grid = $("#calendar-grid");
+  grid.innerHTML = "";
+
+  for (let i = 0; i < totalCells; i++) {
+    const dayNum = i - startOffset + 1;
+    const cellDate = new Date(year, month, dayNum);
+    const key = `${cellDate.getFullYear()}-${String(cellDate.getMonth() + 1).padStart(2, "0")}-${String(cellDate.getDate()).padStart(2, "0")}`;
+    const outside = dayNum < 1 || dayNum > daysInMonth;
+
+    const dayTasks = tasksByDay[key] || [];
+    const visible = dayTasks.slice(0, 3);
+    const extra = dayTasks.length - visible.length;
+
+    const cell = document.createElement("div");
+    cell.className = "calendar-day" + (outside ? " outside" : "") + (key === todayKey ? " today" : "");
+    cell.innerHTML = `
+      <div class="calendar-day-num">${cellDate.getDate()}</div>
+      <div class="calendar-day-tasks">
+        ${visible.map((t) => `<div class="calendar-task-chip" data-id="${t.id}" style="background:${t.color || COLORS[0]}">${escapeHTML(t.title || "(Sin título)")}</div>`).join("")}
+        ${extra > 0 ? `<div class="calendar-day-more">+${extra} más</div>` : ""}
+      </div>
+    `;
+    cell.querySelectorAll(".calendar-task-chip").forEach((chip) => {
+      chip.addEventListener("click", () => openModal(chip.dataset.id));
+    });
+    grid.appendChild(cell);
+  }
+}
+
+$("#cal-prev").addEventListener("click", () => {
+  calendarCursor.setMonth(calendarCursor.getMonth() - 1);
+  renderCalendar();
+});
+$("#cal-next").addEventListener("click", () => {
+  calendarCursor.setMonth(calendarCursor.getMonth() + 1);
+  renderCalendar();
+});
+
+// ===================================================================
 // HOURS VIEW
 // ===================================================================
 function renderHours() {
@@ -728,6 +832,26 @@ function closeModal() {
 $("#modal-close").addEventListener("click", closeModal);
 $("#task-modal").addEventListener("click", (e) => { if (e.target.id === "task-modal") closeModal(); });
 
+const STATUS_LABELS = { "todo": "Por hacer", "in-progress": "En progreso", "done": "Hecho" };
+
+function buildStatusRow(selected) {
+  const row = $("#modal-status-row");
+  row.innerHTML = "";
+  STATUSES.forEach((s) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "status-btn" + (s === selected ? " selected" : "");
+    btn.dataset.status = s;
+    btn.textContent = STATUS_LABELS[s];
+    btn.addEventListener("click", () => {
+      row.querySelectorAll(".status-btn").forEach((b) => b.classList.remove("selected"));
+      btn.classList.add("selected");
+      saveTaskFields();
+    });
+    row.appendChild(btn);
+  });
+}
+
 function buildColorRow(selected) {
   const row = $("#modal-color-row");
   row.innerHTML = "";
@@ -755,10 +879,10 @@ function fillModal(t) {
   if (active !== $("#modal-desc")) $("#modal-desc").value = t.description || "";
   populateAssigneeSelect();
   if (active !== $("#modal-assignee")) $("#modal-assignee").value = t.assigneeId || "";
-  if (active !== $("#modal-status")) $("#modal-status").value = t.status || "todo";
   if (active !== $("#modal-start")) $("#modal-start").value = t.startDate || "";
   if (active !== $("#modal-due")) $("#modal-due").value = t.dueDate || "";
   if (active !== $("#modal-hours")) $("#modal-hours").value = t.estimatedHours ?? "";
+  buildStatusRow(t.status || "todo");
   buildColorRow(t.color || COLORS[0]);
 
   const pct = progressOf(t);
@@ -812,11 +936,12 @@ $("#subtask-input").addEventListener("keydown", async (e) => {
 async function saveTaskFields() {
   if (!activeTaskId) return;
   const color = $("#modal-color-row .color-dot.selected")?.dataset.color || COLORS[0];
+  const status = $("#modal-status-row .status-btn.selected")?.dataset.status || "todo";
   await updateDoc(doc(tasksCol, activeTaskId), {
     title: $("#modal-title").value.trim() || "(Sin título)",
     description: $("#modal-desc").value.trim(),
     assigneeId: $("#modal-assignee").value,
-    status: $("#modal-status").value,
+    status,
     startDate: $("#modal-start").value,
     dueDate: $("#modal-due").value,
     estimatedHours: $("#modal-hours").value ? Number($("#modal-hours").value) : null,
@@ -825,7 +950,7 @@ async function saveTaskFields() {
   });
 }
 
-["modal-title", "modal-desc", "modal-assignee", "modal-status", "modal-start", "modal-due", "modal-hours"]
+["modal-title", "modal-desc", "modal-assignee", "modal-start", "modal-due", "modal-hours"]
   .forEach((id) => $("#" + id).addEventListener("change", saveTaskFields));
 
 $("#save-task-btn").addEventListener("click", async () => {

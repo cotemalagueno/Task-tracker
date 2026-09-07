@@ -195,15 +195,8 @@ input, select, textarea{ font-family: inherit; }
 
 .sidebar-footer{ margin-top:auto; display:flex; align-items:center; justify-content:space-between; padding-top:14px; border-top:1px solid var(--border); }
 .me-badge{ display:flex; align-items:center; gap:8px; min-width:0; }
-.me-avatar-btn{ position:relative; width:30px; height:30px; flex-shrink:0; border:none; padding:0; background:none; cursor:pointer; border-radius:50%; }
 .me-avatar{ width:30px; height:30px; border-radius:50%; overflow:hidden; display:flex; align-items:center; justify-content:center; background:var(--accent-soft); font-size:15px; flex-shrink:0; }
 .me-avatar img{ width:100%; height:100%; object-fit:cover; }
-.me-avatar-edit{
-  position:absolute; inset:0; border-radius:50%; display:flex; align-items:center; justify-content:center;
-  background: rgba(20,22,35,.55); color:#fff; opacity:0; transition: opacity .12s ease;
-}
-.me-avatar-edit svg{ width:13px; height:13px; }
-.me-avatar-btn:hover .me-avatar-edit{ opacity:1; }
 .me-name{ font-size:12.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:110px; }
 
 .main{ flex:1; min-width:0; display:flex; flex-direction:column; }
@@ -248,6 +241,20 @@ input, select, textarea{ font-family: inherit; }
 .task-card-sub{ font-size:10.5px; color:var(--text-faint); margin-top:6px; font-weight:600; }
 .empty-col{ text-align:center; color:var(--text-faint); font-size:12px; padding:20px 0; font-weight:500; }
 
+.task-card-subtasks{ display:flex; flex-direction:column; gap:1px; margin-top:8px; }
+.task-card-subtask{
+  display:flex; align-items:center; gap:7px; padding:3px 2px; border-radius:7px; cursor:pointer;
+}
+.task-card-subtask:hover{ background: var(--surface-2); }
+.task-card-subtask-check{
+  width:15px; height:15px; border-radius:5px; border:2px solid #d6d9e2; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center; color:#fff;
+}
+.task-card-subtask-check svg{ width:9px; height:9px; }
+.task-card-subtask-check.checked{ background: var(--green); border-color: var(--green); }
+.task-card-subtask-text{ font-size:11px; font-weight:600; color:var(--text-dim); line-height:1.3; }
+.task-card-subtask-text.done{ text-decoration:line-through; color:var(--text-faint); }
+
 /* ===================== Timeline (simplified gantt) ===================== */
 .timeline-wrap{ background: var(--surface); border-radius: var(--radius-lg); border:1px solid var(--border); overflow:hidden; }
 .timeline-header{ display:grid; border-bottom:1px solid var(--border); background: var(--surface-2); }
@@ -289,6 +296,30 @@ input, select, textarea{ font-family: inherit; }
 .status-warn .big{ color:#c98a2c; }
 .status-bad .big{ color:#c9553c; }
 
+/* ===================== Calendar ===================== */
+.calendar-wrap{ max-width:1000px; }
+.calendar-toolbar{ display:flex; align-items:center; justify-content:center; gap:18px; margin-bottom:16px; }
+.calendar-month-label{ font-size:15px; font-weight:800; min-width:160px; text-align:center; text-transform:capitalize; }
+.calendar-weekdays{
+  display:grid; grid-template-columns:repeat(7,1fr); gap:8px; margin-bottom:6px;
+  font-size:11px; font-weight:700; color:var(--text-faint); text-align:center; text-transform:uppercase; letter-spacing:.03em;
+}
+.calendar-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:8px; }
+.calendar-day{
+  background: var(--surface); border:1px solid var(--border); border-radius:14px; padding:8px;
+  min-height:96px; display:flex; flex-direction:column; gap:5px;
+}
+.calendar-day.outside{ background: var(--surface-2); opacity:.55; }
+.calendar-day.today{ border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.calendar-day-num{ font-size:11.5px; font-weight:700; color:var(--text-dim); }
+.calendar-day.today .calendar-day-num{ color: var(--accent-dark); }
+.calendar-day-tasks{ display:flex; flex-direction:column; gap:3px; overflow:hidden; }
+.calendar-task-chip{
+  font-size:10px; font-weight:700; color:#fff; border-radius:6px; padding:2.5px 6px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer;
+}
+.calendar-day-more{ font-size:10px; font-weight:700; color:var(--text-faint); padding:0 2px; }
+
 /* ===================== Modal ===================== */
 .modal-overlay{
   position:fixed; inset:0; background: rgba(20,22,35,.42); backdrop-filter: blur(2px);
@@ -299,6 +330,10 @@ input, select, textarea{ font-family: inherit; }
   border-radius:24px; padding:26px 26px 20px; box-shadow: var(--shadow-lg);
 }
 .modal-head{ display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+.modal-simple-title{ margin:0; font-size:17px; font-weight:800; flex:1; }
+.settings-card{ max-width:360px; text-align:center; }
+.settings-card .modal-head{ text-align:left; }
+.settings-card .field{ text-align:left; }
 .modal-title-input{ flex:1; border:none; outline:none; font-size:19px; font-weight:800; padding:6px 4px; background:transparent; }
 .modal-textarea{
   width:100%; border:1px solid var(--border); background:var(--surface-2); border-radius:12px;
@@ -315,6 +350,20 @@ input, select, textarea{ font-family: inherit; }
 .color-row{ display:flex; gap:6px; }
 .color-dot{ width:22px; height:22px; border-radius:50%; cursor:pointer; border:2px solid transparent; }
 .color-dot.selected{ border-color: var(--text); }
+
+.status-btn-row{ display:flex; gap:8px; }
+.status-btn{
+  flex:1; padding:10px 6px; border-radius:12px; border:none; font-size:12.5px; font-weight:700;
+  cursor:pointer; text-align:center; transition: transform .1s ease, box-shadow .1s ease;
+}
+.status-btn:hover{ transform: translateY(-1px); }
+.status-btn[data-status="todo"]{ background:#eef0f4; color:#7a828f; }
+.status-btn[data-status="in-progress"]{ background: var(--amber-soft); color:#a3721f; }
+.status-btn[data-status="done"]{ background: var(--green-soft); color:#3d8562; }
+.status-btn.selected{ box-shadow: var(--shadow-sm); }
+.status-btn.selected[data-status="todo"]{ background:#9aa1ad; color:#fff; }
+.status-btn.selected[data-status="in-progress"]{ background: var(--amber); color:#fff; }
+.status-btn.selected[data-status="done"]{ background: var(--green); color:#fff; }
 
 .progress-block{ margin-bottom:18px; }
 .progress-label{ display:flex; justify-content:space-between; font-size:12px; font-weight:700; color:var(--text-dim); margin-bottom:6px; }
