@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Task Tracker · E-Commerce Cheil</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✅</text></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<!-- ============ LOGIN SCREEN ============ -->
+<div id="login-screen" class="login-screen">
+  <div class="login-card">
+    <div class="login-logo">✅</div>
+    <h1>Task Tracker</h1>
+    <p class="login-sub">E-Commerce · Cheil</p>
+
+    <div class="avatar-picker">
+      <div class="avatar-preview" id="avatar-preview">🙂</div>
+      <label class="btn-ghost small" for="photo-input">Subir foto</label>
+      <input type="file" id="photo-input" accept="image/*" hidden />
+      <div class="emoji-row" id="emoji-row"></div>
+    </div>
+
+    <input type="text" id="name-input" class="text-input" placeholder="Tu nombre" maxlength="30" autocomplete="off" />
+    <button id="login-btn" class="btn-primary" disabled>Entrar al equipo</button>
+    <p class="login-hint">No necesitas contraseña — solo tu nombre y una foto o emoji para identificarte con tu equipo.</p>
+  </div>
+</div>
+
+<!-- ============ APP SHELL ============ -->
+<div id="app" class="app hidden">
+
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-emoji">✅</span>
+      <div>
+        <div class="brand-title">Task Tracker</div>
+        <div class="brand-sub">E-Commerce Cheil</div>
+      </div>
+    </div>
+
+    <nav class="views-nav">
+      <button class="nav-item active" data-view="board">🗂️ Tablero</button>
+      <button class="nav-item" data-view="timeline">📅 Línea de tiempo</button>
+      <button class="nav-item" data-view="hours">⏱️ Tiempos</button>
+    </nav>
+
+    <div class="sidebar-section">
+      <div class="sidebar-title">Equipo</div>
+      <div id="team-list" class="team-list"></div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-title">Filtrar por persona</div>
+      <div id="assignee-filter" class="chip-filter">
+        <button class="chip active" data-assignee="all">Todos</button>
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="me-badge">
+        <div class="me-avatar" id="me-avatar">🙂</div>
+        <div class="me-name" id="me-name">—</div>
+      </div>
+      <button id="logout-btn" class="btn-ghost small">Salir</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <h2 id="view-title">Tablero</h2>
+      <div class="topbar-actions">
+        <span id="sync-indicator" class="sync-indicator">🟢 Sincronizado</span>
+        <button id="new-task-btn" class="btn-primary small">+ Nueva tarea</button>
+      </div>
+    </header>
+
+    <!-- BOARD VIEW -->
+    <section id="view-board" class="view">
+      <div class="board" id="board-columns">
+        <div class="board-col" data-status="todo">
+          <div class="board-col-head"><span class="dot dot-todo"></span> Por hacer <span class="count" id="count-todo">0</span></div>
+          <div class="board-col-body" id="col-todo"></div>
+        </div>
+        <div class="board-col" data-status="in-progress">
+          <div class="board-col-head"><span class="dot dot-progress"></span> En progreso <span class="count" id="count-in-progress">0</span></div>
+          <div class="board-col-body" id="col-in-progress"></div>
+        </div>
+        <div class="board-col" data-status="done">
+          <div class="board-col-head"><span class="dot dot-done"></span> Hecho <span class="count" id="count-done">0</span></div>
+          <div class="board-col-body" id="col-done"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TIMELINE VIEW (simplified gantt) -->
+    <section id="view-timeline" class="view hidden">
+      <div class="timeline-wrap">
+        <div class="timeline-header" id="timeline-header"></div>
+        <div class="timeline-body" id="timeline-body"></div>
+      </div>
+    </section>
+
+    <!-- HOURS VIEW -->
+    <section id="view-hours" class="view hidden">
+      <div class="hours-list" id="hours-list"></div>
+    </section>
+  </main>
+</div>
+
+<!-- ============ TASK MODAL ============ -->
+<div id="task-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-head">
+      <input id="modal-title" class="modal-title-input" placeholder="Nombre de la tarea" maxlength="80" />
+      <button id="modal-close" class="icon-btn">✕</button>
+    </div>
+
+    <textarea id="modal-desc" class="modal-textarea" placeholder="Descripción (opcional)" maxlength="500"></textarea>
+
+    <div class="modal-grid">
+      <div class="field">
+        <label>Responsable</label>
+        <select id="modal-assignee"></select>
+      </div>
+      <div class="field">
+        <label>Estado</label>
+        <select id="modal-status">
+          <option value="todo">Por hacer</option>
+          <option value="in-progress">En progreso</option>
+          <option value="done">Hecho</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Color</label>
+        <div class="color-row" id="modal-color-row"></div>
+      </div>
+      <div class="field">
+        <label>Inicio</label>
+        <input type="date" id="modal-start" />
+      </div>
+      <div class="field">
+        <label>Entrega</label>
+        <input type="date" id="modal-due" />
+      </div>
+      <div class="field">
+        <label>Horas estimadas</label>
+        <input type="number" id="modal-hours" min="0" step="0.5" placeholder="ej. 8" />
+      </div>
+    </div>
+
+    <div class="progress-block">
+      <div class="progress-label">
+        <span>Progreso</span>
+        <span id="modal-progress-pct">0%</span>
+      </div>
+      <div class="progress-bar-track"><div class="progress-bar-fill" id="modal-progress-fill"></div></div>
+    </div>
+
+    <div class="subtasks-block">
+      <div class="subtasks-head">
+        <label>Subtareas</label>
+      </div>
+      <div id="subtasks-list" class="subtasks-list"></div>
+      <div class="subtask-add-row">
+        <input type="text" id="subtask-input" class="text-input small" placeholder="Agregar subtarea y presiona Enter" maxlength="120" />
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button id="delete-task-btn" class="btn-danger-ghost">Eliminar tarea</button>
+      <button id="save-task-btn" class="btn-primary">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="js/firebase-config.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
