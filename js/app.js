@@ -4,7 +4,7 @@ import {
   getAuth, signInAnonymously, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  getFirestore, collection, doc, setDoc, addDoc, updateDoc, deleteDoc,
+  getFirestore, collection, doc, addDoc, updateDoc, deleteDoc,
   onSnapshot, serverTimestamp, query, orderBy
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -14,7 +14,7 @@ import {
 const NEEDS_SETUP = !firebaseConfig.apiKey || firebaseConfig.apiKey === "TU_API_KEY";
 
 if (NEEDS_SETUP) {
-  document.getElementById("login-screen").innerHTML = `
+  document.getElementById("gate-screen").innerHTML = `
     <div class="login-card" style="max-width:460px; text-align:left;">
       <div class="login-logo">⚙️</div>
       <h1 style="text-align:center;">Falta conectar Firebase</h1>
@@ -37,54 +37,191 @@ const tasksCol = collection(db, "tasks");
 // ===================================================================
 // CONSTANTS
 // ===================================================================
+const TEAM_PASSWORD = "Cheil01";
 const COLORS = ["#7c9cff", "#8fd6b4", "#ffcf86", "#ff9d9d", "#8ec9ff", "#c7aef9", "#ffb3d0", "#8fe3d6"];
-const EMOJIS = ["🙂","😀","🚀","🎯","💡","🔥","🌟","🦊","🐱","🐶","🦉","🌈","🎨","☕"];
 const STATUSES = ["todo", "in-progress", "done"];
-const STATUS_LABEL = { "todo": "Por hacer", "in-progress": "En progreso", "done": "Hecho" };
+
+const ICON_CALENDAR = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2.2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/></svg>`;
+const ICON_X_SMALL = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>`;
+const ICON_CHECK_SMALL = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 12.5 9.5 18 20 6"/></svg>`;
 
 // ===================================================================
 // STATE
 // ===================================================================
-let me = null;           // { uid, name, avatarType, avatarValue, colorIndex }
-let users = {};          // uid -> user doc
-let tasks = [];          // array of task docs (with id)
+let me = null;              // { id, name, avatarType, avatarValue, colorIndex } — id = Firestore profile doc id
+let users = {};             // profileId -> user doc (also doubles as the profile directory)
+let tasks = [];
 let currentView = "board";
 let assigneeFilterId = "all";
-let activeTaskId = null; // task currently open in modal
-let pendingLocalIdentity = JSON.parse(localStorage.getItem("tt_identity") || "null");
-let selectedEmoji = EMOJIS[0];
+let activeTaskId = null;
+let tasksUnsub = null;
+let autoLoginTried = false;
 let uploadedPhoto = null;
+let newProfileColorIndex = Math.floor(Math.random() * COLORS.length);
+let pendingAuthProfile = null;
 
 // ===================================================================
 // DOM SHORTCUTS
 // ===================================================================
 const $ = (sel) => document.querySelector(sel);
-const loginScreen = $("#login-screen");
+const gateScreen = $("#gate-screen");
+const profileScreen = $("#profile-screen");
 const appEl = $("#app");
 
 // ===================================================================
-// LOGIN SCREEN SETUP
+// PASSWORD HASHING (Web Crypto, client-side — see README for the security trade-offs)
 // ===================================================================
-function buildEmojiRow() {
-  const row = $("#emoji-row");
-  row.innerHTML = "";
-  EMOJIS.forEach((e) => {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "emoji-choice" + (e === selectedEmoji && !uploadedPhoto ? " selected" : "");
-    b.textContent = e;
-    b.onclick = () => {
-      selectedEmoji = e;
-      uploadedPhoto = null;
-      $("#avatar-preview").innerHTML = e;
-      buildEmojiRow();
-      validateLoginForm();
-    };
-    row.appendChild(b);
+function bytesToB64(bytes) { return btoa(String.fromCharCode(...bytes)); }
+function b64ToBytes(b64) { return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)); }
+
+async function hashPassword(password, existingSaltB64) {
+  const salt = existingSaltB64 ? b64ToBytes(existingSaltB64) : crypto.getRandomValues(new Uint8Array(16));
+  const passBytes = new TextEncoder().encode(password);
+  const combined = new Uint8Array(salt.length + passBytes.length);
+  combined.set(salt);
+  combined.set(passBytes, salt.length);
+  const digest = await crypto.subtle.digest("SHA-256", combined);
+  return { saltB64: bytesToB64(salt), hashB64: bytesToB64(new Uint8Array(digest)) };
+}
+
+// ===================================================================
+// TEAM GATE
+// ===================================================================
+if (localStorage.getItem("tt_gate_ok") === "1") {
+  gateScreen.classList.add("hidden");
+  profileScreen.classList.remove("hidden");
+  initAfterGate();
+} else {
+  $("#gate-password").addEventListener("keydown", (e) => { if (e.key === "Enter") submitGate(); });
+  $("#gate-btn").addEventListener("click", submitGate);
+}
+
+function submitGate() {
+  const val = $("#gate-password").value;
+  if (val === TEAM_PASSWORD) {
+    localStorage.setItem("tt_gate_ok", "1");
+    gateScreen.classList.add("hidden");
+    profileScreen.classList.remove("hidden");
+    initAfterGate();
+  } else {
+    $("#gate-error").classList.remove("hidden");
+    $("#gate-password").value = "";
+    $("#gate-password").focus();
+  }
+}
+
+// ===================================================================
+// PROFILE DIRECTORY + PICKER
+// ===================================================================
+function initAfterGate() {
+  signInAnonymously(auth).catch((err) => {
+    $("#panel-loading").textContent = "No se pudo conectar con Firebase. Revisa la configuración (ver README.md).";
+    console.error(err);
   });
 }
-buildEmojiRow();
-$("#avatar-preview").innerHTML = selectedEmoji;
+
+let usersListenerStarted = false;
+onAuthStateChanged(auth, (user) => {
+  if (!user || NEEDS_SETUP || usersListenerStarted) return;
+  usersListenerStarted = true;
+  onSnapshot(usersCol, (snap) => {
+    users = {};
+    snap.forEach((d) => { users[d.id] = { id: d.id, ...d.data() }; });
+
+    if (!me) {
+      tryAutoLogin();
+      renderProfilePicker();
+    } else {
+      if (users[me.id]) me = { ...me, ...users[me.id] };
+      renderTeamList();
+      renderAssigneeFilter();
+      populateAssigneeSelect();
+      renderCurrentView();
+    }
+  });
+});
+
+function tryAutoLogin() {
+  if (autoLoginTried) return;
+  autoLoginTried = true;
+  const savedId = localStorage.getItem("tt_active_profile_id");
+  if (savedId && users[savedId]) loginAsProfile(users[savedId]);
+}
+
+function showPanel(id) {
+  ["panel-loading", "panel-picker", "panel-auth", "panel-create"].forEach((p) => {
+    $("#" + p).classList.toggle("hidden", p !== id);
+  });
+}
+
+function renderProfilePicker() {
+  if (me) return;
+  showPanel("panel-picker");
+  const grid = $("#profile-grid");
+  grid.innerHTML = "";
+  Object.values(users).forEach((u) => {
+    const tile = document.createElement("div");
+    tile.className = "profile-tile";
+    tile.innerHTML = `<span class="avatar-sm">${avatarHTML(u)}</span><span class="profile-tile-name">${escapeHTML(u.name)}</span>`;
+    tile.addEventListener("click", () => openAuthPanel(u));
+    grid.appendChild(tile);
+  });
+}
+
+$("#new-profile-btn").addEventListener("click", openCreatePanel);
+
+function openAuthPanel(u) {
+  pendingAuthProfile = u;
+  showPanel("panel-auth");
+  $("#auth-avatar").innerHTML = avatarHTML(u);
+  $("#auth-name").textContent = u.name;
+  $("#auth-password").value = "";
+  $("#auth-error").classList.add("hidden");
+  setTimeout(() => $("#auth-password").focus(), 50);
+}
+
+$("#auth-back-btn").addEventListener("click", () => { pendingAuthProfile = null; renderProfilePicker(); });
+
+async function submitAuth() {
+  if (!pendingAuthProfile) return;
+  const entered = $("#auth-password").value;
+  const { hashB64 } = await hashPassword(entered, pendingAuthProfile.passwordSalt);
+  if (hashB64 === pendingAuthProfile.passwordHash) {
+    loginAsProfile(pendingAuthProfile);
+  } else {
+    $("#auth-error").classList.remove("hidden");
+  }
+}
+$("#auth-btn").addEventListener("click", submitAuth);
+$("#auth-password").addEventListener("keydown", (e) => { if (e.key === "Enter") submitAuth(); });
+
+function openCreatePanel() {
+  uploadedPhoto = null;
+  newProfileColorIndex = Math.floor(Math.random() * COLORS.length);
+  $("#name-input").value = "";
+  $("#create-password").value = "";
+  $("#create-password-confirm").value = "";
+  $("#create-error").classList.add("hidden");
+  updateCreateAvatarPreview();
+  validateCreateForm();
+  showPanel("panel-create");
+  setTimeout(() => $("#name-input").focus(), 50);
+}
+$("#create-back-btn").addEventListener("click", renderProfilePicker);
+
+function updateCreateAvatarPreview() {
+  if (uploadedPhoto) {
+    $("#avatar-preview").innerHTML = `<img src="${uploadedPhoto}" />`;
+    return;
+  }
+  const color = COLORS[newProfileColorIndex];
+  const initials = initialsOf($("#name-input").value || "?");
+  $("#avatar-preview").innerHTML = `<span class="initials-avatar" style="background:${color}22;color:${color}">${initials}</span>`;
+}
+
+$("#name-input").addEventListener("input", () => { updateCreateAvatarPreview(); validateCreateForm(); });
+$("#create-password").addEventListener("input", validateCreateForm);
+$("#create-password-confirm").addEventListener("input", validateCreateForm);
 
 $("#photo-input").addEventListener("change", (e) => {
   const file = e.target.files[0];
@@ -101,95 +238,89 @@ $("#photo-input").addEventListener("change", (e) => {
       const w = img.width * scale, h = img.height * scale;
       ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
       uploadedPhoto = canvas.toDataURL("image/jpeg", 0.75);
-      $("#avatar-preview").innerHTML = `<img src="${uploadedPhoto}" />`;
-      buildEmojiRow();
-      validateLoginForm();
+      updateCreateAvatarPreview();
     };
     img.src = ev.target.result;
   };
   reader.readAsDataURL(file);
 });
 
-$("#name-input").addEventListener("input", validateLoginForm);
-function validateLoginForm() {
-  $("#login-btn").disabled = $("#name-input").value.trim().length === 0;
+function validateCreateForm() {
+  const name = $("#name-input").value.trim();
+  const pass = $("#create-password").value;
+  const confirm = $("#create-password-confirm").value;
+  $("#create-btn").disabled = !(name.length > 0 && pass.length >= 4 && pass === confirm);
 }
 
-$("#login-btn").addEventListener("click", async () => {
+$("#create-btn").addEventListener("click", async () => {
   const name = $("#name-input").value.trim();
-  if (!name) return;
-  $("#login-btn").disabled = true;
-  $("#login-btn").textContent = "Entrando...";
-  const identity = {
-    name,
-    avatarType: uploadedPhoto ? "photo" : "emoji",
-    avatarValue: uploadedPhoto || selectedEmoji,
-    colorIndex: Math.floor(Math.random() * COLORS.length)
-  };
-  localStorage.setItem("tt_identity", JSON.stringify(identity));
-  pendingLocalIdentity = identity;
-  await ensureSignedIn();
+  const pass = $("#create-password").value;
+  const confirm = $("#create-password-confirm").value;
+  if (pass.length < 4) { showCreateError("La clave debe tener al menos 4 caracteres."); return; }
+  if (pass !== confirm) { showCreateError("Las claves no coinciden."); return; }
+
+  $("#create-btn").disabled = true;
+  $("#create-btn").textContent = "Creando...";
+  try {
+    const { saltB64, hashB64 } = await hashPassword(pass);
+    const ref = await addDoc(usersCol, {
+      name,
+      avatarType: uploadedPhoto ? "photo" : "initials",
+      avatarValue: uploadedPhoto || null,
+      colorIndex: newProfileColorIndex,
+      passwordSalt: saltB64,
+      passwordHash: hashB64,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    loginAsProfile({ id: ref.id, name, avatarType: uploadedPhoto ? "photo" : "initials", avatarValue: uploadedPhoto, colorIndex: newProfileColorIndex });
+  } catch (err) {
+    showCreateError("No se pudo crear el usuario. Intenta de nuevo.");
+    console.error(err);
+  } finally {
+    $("#create-btn").disabled = false;
+    $("#create-btn").textContent = "Crear mi usuario";
+  }
 });
 
-// ===================================================================
-// AUTH
-// ===================================================================
-function ensureSignedIn() {
-  return signInAnonymously(auth).catch((err) => {
-    alert("No se pudo conectar con Firebase. Revisa tu configuración y las reglas de Authentication.\n\n" + err.message);
-  });
+function showCreateError(msg) {
+  const el = $("#create-error");
+  el.textContent = msg;
+  el.classList.remove("hidden");
 }
 
-onAuthStateChanged(auth, async (user) => {
-  if (!user) return;
-  const identity = pendingLocalIdentity || JSON.parse(localStorage.getItem("tt_identity") || "null");
-  if (!identity) return; // still on login screen, waiting for the user to submit the form
+function loginAsProfile(profile) {
+  me = { id: profile.id, name: profile.name, avatarType: profile.avatarType, avatarValue: profile.avatarValue, colorIndex: profile.colorIndex };
+  localStorage.setItem("tt_active_profile_id", me.id);
 
-  me = { uid: user.uid, ...identity };
-  await setDoc(doc(usersCol, user.uid), {
-    name: identity.name,
-    avatarType: identity.avatarType,
-    avatarValue: identity.avatarValue,
-    colorIndex: identity.colorIndex,
-    updatedAt: serverTimestamp()
-  }, { merge: true });
-
-  loginScreen.classList.add("hidden");
+  profileScreen.classList.add("hidden");
   appEl.classList.remove("hidden");
   $("#me-name").textContent = me.name;
   $("#me-avatar").innerHTML = avatarHTML(me);
 
-  startListeners();
-});
-
-// If a previous session identity exists, auto sign-in silently on load.
-if (pendingLocalIdentity) {
-  ensureSignedIn();
+  renderTeamList();
+  renderAssigneeFilter();
+  populateAssigneeSelect();
+  startTaskListener();
 }
 
 $("#logout-btn").addEventListener("click", () => {
-  localStorage.removeItem("tt_identity");
-  location.reload();
+  localStorage.removeItem("tt_active_profile_id");
+  me = null;
+  appEl.classList.add("hidden");
+  profileScreen.classList.remove("hidden");
+  renderProfilePicker();
 });
 
 // ===================================================================
-// REALTIME LISTENERS
+// TASKS LISTENER (starts once logged in)
 // ===================================================================
-function startListeners() {
-  onSnapshot(usersCol, (snap) => {
-    users = {};
-    snap.forEach((d) => { users[d.id] = { id: d.id, ...d.data() }; });
-    renderTeamList();
-    renderAssigneeFilter();
-    populateAssigneeSelect();
-    renderCurrentView();
-  });
-
+function startTaskListener() {
+  if (tasksUnsub) return;
   const q = query(tasksCol, orderBy("createdAt", "asc"));
-  onSnapshot(q, (snap) => {
+  tasksUnsub = onSnapshot(q, (snap) => {
     tasks = [];
     snap.forEach((d) => tasks.push({ id: d.id, ...d.data() }));
-    flashSync();
     renderCurrentView();
     if (activeTaskId) {
       const t = tasks.find((x) => x.id === activeTaskId);
@@ -198,18 +329,21 @@ function startListeners() {
   });
 }
 
-function flashSync() {
-  const el = $("#sync-indicator");
-  el.textContent = "🟢 Sincronizado";
-}
-
 // ===================================================================
 // AVATAR / HELPERS
 // ===================================================================
+function initialsOf(name) {
+  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return "?";
+}
+
 function avatarHTML(u) {
-  if (!u) return "🙂";
+  if (!u) return `<span class="initials-avatar" style="background:${COLORS[0]}22;color:${COLORS[0]}">?</span>`;
   if (u.avatarType === "photo" && u.avatarValue) return `<img src="${u.avatarValue}" />`;
-  return u.avatarValue || "🙂";
+  const color = COLORS[(u.colorIndex ?? 0) % COLORS.length];
+  return `<span class="initials-avatar" style="background:${color}22;color:${color}">${initialsOf(u.name)}</span>`;
 }
 
 function progressOf(task) {
@@ -316,12 +450,13 @@ document.querySelectorAll(".nav-item").forEach((btn) => {
     currentView = btn.dataset.view;
     document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
     $("#view-" + currentView).classList.remove("hidden");
-    $("#view-title").textContent = btn.textContent.trim().replace(/^\S+\s/, "");
+    $("#view-title").textContent = btn.querySelector("span").textContent;
     renderCurrentView();
   });
 });
 
 function renderCurrentView() {
+  if (!me) return;
   if (currentView === "board") renderBoard();
   else if (currentView === "timeline") renderTimeline();
   else if (currentView === "hours") renderHours();
@@ -367,7 +502,7 @@ function taskCard(t) {
   card.innerHTML = `
     <div class="task-card-title">${escapeHTML(t.title || "(Sin título)")}</div>
     <div class="task-card-meta">
-      <span class="task-card-due ${urgent ? "urgent" : ""}">📅 ${t.dueDate ? formatShortDate(t.dueDate) : "Sin fecha"}</span>
+      <span class="task-card-due ${urgent ? "urgent" : ""}">${ICON_CALENDAR}${t.dueDate ? formatShortDate(t.dueDate) : "Sin fecha"}</span>
       ${assignee ? `<span class="avatar-sm" title="${escapeHTML(assignee.name)}">${avatarHTML(assignee)}</span>` : ""}
     </div>
     <div class="task-card-bar"><div class="task-card-bar-fill" style="width:${pct}%; background:${t.color || COLORS[0]}"></div></div>
@@ -404,7 +539,7 @@ function renderTimeline() {
   body.innerHTML = "";
 
   if (list.length === 0) {
-    body.innerHTML = `<div class="timeline-empty">Crea una tarea con fechas de inicio y entrega para verla aquí ✨</div>`;
+    body.innerHTML = `<div class="timeline-empty">Crea una tarea con fechas de inicio y entrega para verla aquí</div>`;
     return;
   }
 
@@ -504,7 +639,7 @@ function renderHours() {
     const h = daysBetween(t.dueDate);
     const status = urgencyStatus(t);
     let bigText, lblText;
-    if (t.status === "done") { bigText = "✓ Hecho"; lblText = "Completada"; }
+    if (t.status === "done") { bigText = `${ICON_CHECK_SMALL} Hecho`; lblText = "Completada"; }
     else if (h === null) { bigText = "—"; lblText = "Sin fecha límite"; }
     else if (h < 0) { bigText = fmtHours(h); lblText = "Atrasada"; }
     else { bigText = fmtHours(h); lblText = "Restante"; }
@@ -512,7 +647,7 @@ function renderHours() {
     const card = document.createElement("div");
     card.className = "hour-card";
     card.innerHTML = `
-      <span class="hour-avatar">${assignee ? avatarHTML(assignee) : "👤"}</span>
+      <span class="hour-avatar">${avatarHTML(assignee)}</span>
       <div class="hour-main">
         <div class="hour-title">${escapeHTML(t.title || "(Sin título)")}</div>
         <div class="hour-bar-track"><div class="hour-bar-fill" style="width:${pct}%; background:${t.color || COLORS[0]}"></div></div>
@@ -534,14 +669,14 @@ $("#new-task-btn").addEventListener("click", async () => {
   const ref = await addDoc(tasksCol, {
     title: "",
     description: "",
-    assigneeId: me.uid,
+    assigneeId: me.id,
     status: "todo",
     color: COLORS[Math.floor(Math.random() * COLORS.length)],
     startDate: todayStr(),
     dueDate: "",
     estimatedHours: null,
     subtasks: [],
-    createdBy: me.uid,
+    createdBy: me.id,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   });
@@ -564,7 +699,6 @@ function closeModal() {
 $("#modal-close").addEventListener("click", closeModal);
 $("#task-modal").addEventListener("click", (e) => { if (e.target.id === "task-modal") closeModal(); });
 
-let modalColorRowBuilt = false;
 function buildColorRow(selected) {
   const row = $("#modal-color-row");
   row.innerHTML = "";
@@ -612,9 +746,9 @@ function renderSubtasks(t) {
     const row = document.createElement("div");
     row.className = "subtask-row";
     row.innerHTML = `
-      <div class="subtask-check ${s.done ? "checked" : ""}" data-id="${s.id}">${s.done ? "✓" : ""}</div>
+      <div class="subtask-check ${s.done ? "checked" : ""}" data-id="${s.id}">${s.done ? ICON_CHECK_SMALL : ""}</div>
       <div class="subtask-text ${s.done ? "done" : ""}">${escapeHTML(s.title)}</div>
-      <button class="subtask-remove" data-id="${s.id}">✕</button>
+      <button class="subtask-remove" data-id="${s.id}">${ICON_X_SMALL}</button>
     `;
     row.querySelector(".subtask-check").addEventListener("click", () => toggleSubtask(t.id, s.id));
     row.querySelector(".subtask-remove").addEventListener("click", () => removeSubtask(t.id, s.id));

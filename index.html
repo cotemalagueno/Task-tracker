@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Task Tracker · E-Commerce Cheil</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✅</text></svg>" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%237c9cff%22 stroke-width=%222%22><circle cx=%2212%22 cy=%2212%22 r=%229%22/><polyline points=%228 12.5 10.8 15.3 16 9.5%22/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -12,23 +12,71 @@
 </head>
 <body>
 
-<!-- ============ LOGIN SCREEN ============ -->
-<div id="login-screen" class="login-screen">
+<!-- ============ GATE SCREEN (team password) ============ -->
+<div id="gate-screen" class="login-screen">
   <div class="login-card">
-    <div class="login-logo">✅</div>
+    <div class="login-logo icon-xl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2.2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></div>
     <h1>Task Tracker</h1>
     <p class="login-sub">E-Commerce · Cheil</p>
+    <input type="password" id="gate-password" class="text-input" placeholder="Clave del equipo" autocomplete="off" />
+    <button id="gate-btn" class="btn-primary">Entrar</button>
+    <p id="gate-error" class="form-error hidden">Clave incorrecta, intenta de nuevo.</p>
+    <p class="login-hint">Pídele la clave a tu equipo de E-Commerce si no la tienes.</p>
+  </div>
+</div>
 
-    <div class="avatar-picker">
-      <div class="avatar-preview" id="avatar-preview">🙂</div>
-      <label class="btn-ghost small" for="photo-input">Subir foto</label>
-      <input type="file" id="photo-input" accept="image/*" hidden />
-      <div class="emoji-row" id="emoji-row"></div>
+<!-- ============ PROFILE SCREEN (pick / create / password) ============ -->
+<div id="profile-screen" class="login-screen hidden">
+  <div class="login-card">
+
+    <div id="panel-loading" class="panel-loading">Cargando perfiles…</div>
+
+    <!-- Existing profiles picker -->
+    <div id="panel-picker" class="hidden">
+      <h1>¿Quién eres?</h1>
+      <p class="login-sub">Elige tu perfil o crea uno nuevo</p>
+      <div id="profile-grid" class="profile-grid"></div>
+      <button id="new-profile-btn" class="btn-ghost" style="width:100%;margin-top:6px;">
+        <span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="8" r="3.3"/><path d="M4 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><line x1="18" y1="8" x2="18" y2="13"/><line x1="15.5" y1="10.5" x2="20.5" y2="10.5"/></svg></span>
+        Crear mi usuario
+      </button>
     </div>
 
-    <input type="text" id="name-input" class="text-input" placeholder="Tu nombre" maxlength="30" autocomplete="off" />
-    <button id="login-btn" class="btn-primary" disabled>Entrar al equipo</button>
-    <p class="login-hint">No necesitas contraseña — solo tu nombre y una foto o emoji para identificarte con tu equipo.</p>
+    <!-- Password prompt for a chosen existing profile -->
+    <div id="panel-auth" class="hidden">
+      <button class="back-link" id="auth-back-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        Volver
+      </button>
+      <div class="avatar-preview" id="auth-avatar"></div>
+      <h1 id="auth-name" style="text-align:center;"></h1>
+      <input type="password" id="auth-password" class="text-input" placeholder="Tu clave" autocomplete="off" />
+      <button id="auth-btn" class="btn-primary">Entrar</button>
+      <p id="auth-error" class="form-error hidden">Clave incorrecta.</p>
+    </div>
+
+    <!-- Create a new profile -->
+    <div id="panel-create" class="hidden">
+      <button class="back-link" id="create-back-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        Volver
+      </button>
+      <div class="avatar-picker">
+        <div class="avatar-preview" id="avatar-preview"></div>
+        <label class="btn-ghost small" for="photo-input">
+          <span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8a2 2 0 0 1 2-2h1.2l1.3-1.8h6.9L16.8 6H18a2 2 0 0 1 2 2v9.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.3"/></svg></span>
+          Subir foto
+        </label>
+        <input type="file" id="photo-input" accept="image/*" hidden />
+      </div>
+      <input type="text" id="name-input" class="text-input" placeholder="Tu nombre" maxlength="30" autocomplete="off" />
+      <input type="password" id="create-password" class="text-input" placeholder="Crea una clave" autocomplete="off" />
+      <input type="password" id="create-password-confirm" class="text-input" placeholder="Repite la clave" autocomplete="off" />
+      <button id="create-btn" class="btn-primary" disabled>Crear mi usuario</button>
+      <p id="create-error" class="form-error hidden"></p>
+      <p class="login-hint">Tu clave solo te identifica frente al resto del equipo — no la reutilices de otros sitios.</p>
+    </div>
+
   </div>
 </div>
 
@@ -37,7 +85,7 @@
 
   <aside class="sidebar">
     <div class="brand">
-      <span class="brand-emoji">✅</span>
+      <span class="brand-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="8 12.5 10.8 15.3 16 9.5"/></svg></span>
       <div>
         <div class="brand-title">Task Tracker</div>
         <div class="brand-sub">E-Commerce Cheil</div>
@@ -45,9 +93,18 @@
     </div>
 
     <nav class="views-nav">
-      <button class="nav-item active" data-view="board">🗂️ Tablero</button>
-      <button class="nav-item" data-view="timeline">📅 Línea de tiempo</button>
-      <button class="nav-item" data-view="hours">⏱️ Tiempos</button>
+      <button class="nav-item active" data-view="board">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="5" height="16" rx="1.4"/><rect x="10" y="4" width="5" height="10" rx="1.4"/><rect x="17" y="4" width="4" height="7" rx="1.4"/></svg>
+        <span>Tablero</span>
+      </button>
+      <button class="nav-item" data-view="timeline">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2.2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/></svg>
+        <span>Línea de tiempo</span>
+      </button>
+      <button class="nav-item" data-view="hours">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12.3 15.5 14.3"/></svg>
+        <span>Tiempos</span>
+      </button>
     </nav>
 
     <div class="sidebar-section">
@@ -64,10 +121,12 @@
 
     <div class="sidebar-footer">
       <div class="me-badge">
-        <div class="me-avatar" id="me-avatar">🙂</div>
+        <div class="me-avatar" id="me-avatar"></div>
         <div class="me-name" id="me-name">—</div>
       </div>
-      <button id="logout-btn" class="btn-ghost small">Salir</button>
+      <button id="logout-btn" class="icon-btn" title="Cambiar de usuario">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 20 7 16 11"/><path d="M4 11V9a2 2 0 0 1 2-2h14"/><polyline points="8 21 4 17 8 13"/><path d="M20 13v2a2 2 0 0 1-2 2H4"/></svg>
+      </button>
     </div>
   </aside>
 
@@ -75,8 +134,11 @@
     <header class="topbar">
       <h2 id="view-title">Tablero</h2>
       <div class="topbar-actions">
-        <span id="sync-indicator" class="sync-indicator">🟢 Sincronizado</span>
-        <button id="new-task-btn" class="btn-primary small">+ Nueva tarea</button>
+        <span id="sync-indicator" class="sync-indicator"><span class="sync-dot"></span> Sincronizado</span>
+        <button id="new-task-btn" class="btn-primary small">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="vertical-align:-3px;margin-right:2px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Nueva tarea
+        </button>
       </div>
     </header>
 
@@ -118,7 +180,9 @@
   <div class="modal">
     <div class="modal-head">
       <input id="modal-title" class="modal-title-input" placeholder="Nombre de la tarea" maxlength="80" />
-      <button id="modal-close" class="icon-btn">✕</button>
+      <button id="modal-close" class="icon-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+      </button>
     </div>
 
     <textarea id="modal-desc" class="modal-textarea" placeholder="Descripción (opcional)" maxlength="500"></textarea>
@@ -173,7 +237,10 @@
     </div>
 
     <div class="modal-footer">
-      <button id="delete-task-btn" class="btn-danger-ghost">Eliminar tarea</button>
+      <button id="delete-task-btn" class="btn-danger-ghost">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-4px;margin-right:4px;"><polyline points="4 7 20 7"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M9 7V4.6A1.1 1.1 0 0 1 10.1 3.5h3.8A1.1 1.1 0 0 1 15 4.6V7"/></svg>
+        Eliminar tarea
+      </button>
       <button id="save-task-btn" class="btn-primary">Cerrar</button>
     </div>
   </div>

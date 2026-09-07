@@ -12,8 +12,18 @@ base de datos gratuita en tiempo real y GitHub Pages para el link público.
 - **Línea de tiempo** simplificada (barras por tarea sobre un calendario, sin flechas de
   dependencia ni cruces confusas).
 - **Vista de Tiempos**: horas/días restantes hasta la entrega de cada tarea, ordenadas por urgencia.
-- **"Login" sin contraseña**: cada persona entra con su nombre + una foto o un emoji.
+- **Clave de equipo**: antes de todo, pide una clave general (`Cheil01` por defecto) para que
+  gente ajena al equipo no pueda entrar ni crear usuarios.
+- **Perfiles con contraseña**: cada persona crea su usuario una vez (nombre + foto opcional +
+  clave) y luego puede entrar desde cualquier navegador o computador eligiendo su perfil e
+  ingresando su clave — no hay que "crear un usuario nuevo" cada vez.
 - Todo se sincroniza en tiempo real entre todo el equipo.
+
+> **Nota de seguridad:** las claves de usuario se verifican comparando un hash en el navegador
+> contra la base de datos, que cualquier miembro del equipo con conocimientos técnicos podría
+> inspeccionar. Es una barrera suficiente para mantener fuera a gente random y evitar que un
+> compañero entre a tu perfil por error, pero no reemplaza una clave "de verdad" — nadie debería
+> reusar aquí una contraseña importante de otro sitio.
 
 ---
 
@@ -113,9 +123,16 @@ y probar directo en GitHub Pages una vez publicado — Paso 7).
 
 ## Paso 8 — Compartir con tu equipo
 
-Envía ese link a tus compañeros de E-Commerce. Cada uno, al entrar, pone su nombre y
-elige una foto (se recorta automáticamente) o un emoji — sin contraseñas. Todos verán
-las mismas tareas sincronizadas en tiempo real.
+Envía ese link a tus compañeros de E-Commerce, junto con la clave de equipo (por defecto
+`Cheil01` — puedes cambiarla editando la constante `TEAM_PASSWORD` en `js/app.js`).
+
+La primera vez, cada persona:
+1. Escribe la clave de equipo.
+2. Toca **"Crear mi usuario"**, pone su nombre, sube una foto (opcional) y crea su propia clave.
+
+Las siguientes veces (incluso desde otro computador o navegador), solo elige su perfil de
+la lista y escribe su clave — no vuelve a "crear" un usuario nuevo. Todos ven las mismas
+tareas sincronizadas en tiempo real.
 
 ---
 
@@ -134,4 +151,12 @@ en `css/styles.css`.
 No, todo se guarda automáticamente y se sincroniza solo — no hay botón de "publicar".
 
 **¿Puedo cambiar el nombre del equipo o el logo?**
-Sí, edita el texto "E-Commerce Cheil" y el emoji ✅ en `index.html`.
+Sí, edita el texto "E-Commerce Cheil" en `index.html`.
+
+**¿Puedo cambiar la clave de equipo?**
+Sí, edita la constante `TEAM_PASSWORD` al inicio de `js/app.js` y súbelo de nuevo a GitHub.
+
+**Alguien olvidó su clave, ¿qué hago?**
+No hay recuperación de clave (no hay email ni backend). La persona debe crear un perfil
+nuevo con otro nombre, o tú puedes borrar su documento en la colección `users` de Firestore
+para que pueda volver a crearlo con el mismo nombre.
